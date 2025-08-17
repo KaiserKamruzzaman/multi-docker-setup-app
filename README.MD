@@ -1,4 +1,4 @@
-# Course Goals (Dockerized MERN Demo)
+# My Goals (Dockerized MERN Demo)
 
 Minimal MERN-style example split into a Node/Express + MongoDB backend and a React frontend. The app lets you create and delete simple "goal" items.
 

@@ -1,0 +1,11 @@
+cat > .gitignore <<'EOF'
+# Node
+backend/node_modules/
+frontend/node_modules/
+*.log
+backend/logs/
+# Build
+frontend/build/
+# Mac
+.DS_Store
+EOF

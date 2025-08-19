@@ -1,121 +1,155 @@
 # My Goals (Dockerized MERN Demo)
 
-Minimal MERN-style example split into a Node/Express + MongoDB backend and a React frontend. The app lets you create and delete simple "goal" items.
+Minimal MERN-style example: Node/Express + MongoDB backend & React frontend to create/delete simple "goal" items.
 
 ## Structure
 
 ```
-backend/   -> Express API + Mongoose ([backend/app.js](backend/app.js))
-frontend/  -> React UI ([frontend/src/App.js](frontend/src/App.js))
+backend/          Express API (Mongo + Mongoose)
+frontend/         React app
+docker-compose.yaml
+env/              Environment files (mongo.env, backend.env)
 ```
-
-Key files:
-
-- Backend server: [backend/app.js](backend/app.js)
-- Mongoose model: [backend/models/goal.js](backend/models/goal.js)
-- Frontend root component: [frontend/src/App.js](frontend/src/App.js)
-- Goal list components: [frontend/src/components/goals/CourseGoals.js](frontend/src/components/goals/CourseGoals.js), [frontend/src/components/goals/GoalItem.js](frontend/src/components/goals/GoalItem.js), [frontend/src/components/goals/GoalInput.js](frontend/src/components/goals/GoalInput.js)
-- UI components: [frontend/src/components/UI/Card.js](frontend/src/components/UI/Card.js), [frontend/src/components/UI/ErrorAlert.js](frontend/src/components/UI/ErrorAlert.js), [frontend/src/components/UI/LoadingSpinner.js](frontend/src/components/UI/LoadingSpinner.js)
-- Logging output: backend/logs/access.log (created via morgan in [backend/app.js](backend/app.js))
 
 ## Backend (Express + MongoDB)
 
-Defined in [backend/app.js](backend/app.js). Connects to MongoDB at:
+File: backend/app.js  
+Default connection (hardcoded):
 
 ```
 mongodb://root:root@mongodb:27017/course-goals?authSource=admin
 ```
 
-Model: [backend/models/goal.js](backend/models/goal.js)
-
-CORS is open (Access-Control-Allow-Origin: \*).
+Model: backend/models/goal.js
 
 ### Endpoints
 
-- GET /goals  
-  Returns: `{ goals: [{ id, text }, ...] }`
-- POST /goals  
-  Body: `{ "text": "My goal" }`  
-  Returns: `{ message, goal: { id, text } }`
-- DELETE /goals/:id  
-  Returns: `{ message }`
+- GET /goals -> { goals: [{ id, text }] }
+- POST /goals { "text": "My goal" } -> { message, goal }
+- DELETE /goals/:id -> { message }
 
-Validation: Rejects empty text (422). Errors -> 500 JSON message.
-
-### Logging
-
-Requests logged to `backend/logs/access.log` via morgan ("combined" format).
+Validation: empty text => 422 JSON. Other errors => 500 JSON.  
+Logging: backend/logs/access.log via morgan (combined).
 
 ## Frontend (React)
 
-Entry: [frontend/src/index.js](frontend/src/index.js)  
-Root component: [frontend/src/App.js](frontend/src/App.js)
+Entry: frontend/src/index.js  
+Root: frontend/src/App.js  
+Fetch base: http://localhost/goals (expects backend bound to host port 80)
 
-Behavior:
+State handled: loadedGoals, isLoading, error  
+Components:
 
-- Loads goals on mount (GET http://localhost/goals)
-- Adds goals (POST)
-- Deletes goals (DELETE)
-- Displays error via [frontend/src/components/UI/ErrorAlert.js](frontend/src/components/UI/ErrorAlert.js)
+- Goals: frontend/src/components/goals/{CourseGoals.js,GoalItem.js,GoalInput.js}
+- UI: frontend/src/components/UI/{Card.js,ErrorAlert.js,LoadingSpinner.js}
 
-State:
+## Running with Docker Compose
 
-- loadedGoals
-- isLoading
-- error
+Prereq: Docker + Compose plugin.
 
-UI Pieces:
+docker-compose.yaml defines:
 
-- Input form: [frontend/src/components/goals/GoalInput.js](frontend/src/components/goals/GoalInput.js)
-- List: [frontend/src/components/goals/CourseGoals.js](frontend/src/components/goals/CourseGoals.js)
-- Item: [frontend/src/components/goals/GoalItem.js](frontend/src/components/goals/GoalItem.js)
+- mongodb (persistent volume: mongoData)
+- backend (port 80:80, code bind-mounted for live reload)
+- frontend (port 3000:3000, src bind-mounted for hot reload)
 
-Spinner component present ([frontend/src/components/UI/LoadingSpinner.js](frontend/src/components/UI/LoadingSpinner.js)) but not yet used in App.
-
-## Running with Docker
-
-Build images (run from each folder):
+Environment files (create/edit):
+env/mongo.env:
 
 ```
-# Backend
+MONGO_INITDB_ROOT_USERNAME=root
+MONGO_INITDB_ROOT_PASSWORD=root
+```
+
+env/backend.env (example placeholders):
+
+```
+MONGODB_USERNAME=root
+MONGODB_PASSWORD=root
+MONGODB_DATABASE=course-goals
+```
+
+(backend currently still uses hardcoded string—adjust code to read these if desired)
+
+Start (build + run):
+
+```
+docker compose up --build
+```
+
+Stop:
+
+```
+docker compose down
+```
+
+Stop + remove volumes (Mongo data + logs):
+
+```
+docker compose down -v
+```
+
+Access:
+
+- Frontend: http://localhost:3000
+- API: http://localhost/goals
+
+### Custom Image Names
+
+In docker-compose.yaml set:
+
+```
+image: your-dockerhub-user/goals-backend:1.0.0
+image: your-dockerhub-user/goals-frontend:1.0.0
+```
+
+Build:
+
+```
+docker compose build
+```
+
+Login & push:
+
+```
+docker login
+docker compose push
+```
+
+Retag for new versions (e.g. :1.0.1) then rebuild & push.
+
+## Manual Docker (Without Compose)
+
+Backend:
+
+```
 cd backend
 docker build -t goals-backend .
-
-# Frontend
-cd ../frontend
-docker build -t goals-frontend .
-```
-
-Run containers (example):
-
-```
-# MongoDB (simple dev instance)
-docker run -d --name mongodb -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=root mongo
-
-# Backend (expects Mongo hostname "mongodb")
+docker run -d --name mongodb -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=root mongo
 docker run -d --name goals-backend --link mongodb:mongodb -p 80:80 goals-backend
+```
 
-# Frontend (CRA dev server on 3000)
+Frontend:
+
+```
+cd frontend
+docker build -t goals-frontend .
 docker run -d --name goals-frontend --link goals-backend:backend -p 3000:3000 goals-frontend
 ```
 
-Access UI: http://localhost:3000  
-API base (from frontend code): http://localhost/goals (so ensure backend published on host port 80)
-
-If you map backend differently (e.g. 8080), update fetch URLs in [frontend/src/App.js](frontend/src/App.js).
-
-## Local (Without Docker)
+## Local Dev (No Docker)
 
 Backend:
 
 ```
 cd backend
 npm install
-# Ensure local MongoDB with user/pass root/root or adjust connection string in app.js
 npm start
 ```
 
-Frontend (separate terminal):
+(Adjust Mongo URI in backend/app.js to local instance if needed.)
+Frontend:
 
 ```
 cd frontend
@@ -125,26 +159,5 @@ npm start
 
 ## Scripts
 
-Backend `package.json`:
-
-- `start`: nodemon app.js
-
-Frontend `package.json`:
-
-- `start`: react-scripts start
-- `build`: react-scripts build
-- `test`: react-scripts test
-
-## Notes / Improvements
-
-- Connection string is hardcoded; Dockerfile sets ENV vars but they are unused. Consider reading `process.env.MONGODB_USERNAME` / `MONGODB_PASSWORD`.
-- Add a docker-compose.yml to orchestrate Mongo + backend + frontend.
-- Use the existing LoadingSpinner component in [frontend/src/components/UI/LoadingSpinner.js](frontend/src/components/UI/LoadingSpinner.js) while fetching.
-- Centralize API base URL via environment variable (e.g. `REACT_APP_API_BASE`).
-- Add error reset and optimistic UI updates.
-- Add schema validation (e.g. required text) in [backend/models/goal.js](backend/models/goal.js).
-- Add tests for components and endpoints.
-
-## License
-
-Educational demo; original author attribution present in
+Backend: npm start (nodemon)  
+Frontend: npm start | npm run build | npm test
